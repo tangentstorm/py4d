@@ -70,8 +70,10 @@ uses
 {$IFDEF MSWINDOWS}
   Windows,
 {$ENDIF}
-{$IFDEF LINUX}
+{$IFDEF UNIX}
   Types,
+{$ENDIF}
+{$IFDEF LINUX}
   Libc,
 {$ENDIF}
   Classes,
@@ -84,6 +86,9 @@ uses
 {$ENDIF}
 {$ELSE}
   TinyWideStrings,
+{$ENDIF}
+{$IFDEF FPC}
+  dynlibs,
 {$ENDIF}
   MethodCallBack;
 
@@ -137,7 +142,7 @@ const
     (DllName: 'python32.dll'; RegVersion: '3.2'; APIVersion: 1013; CanUseLatest: True),
     (DllName: 'python33.dll'; RegVersion: '3.3'; APIVersion: 1013; CanUseLatest: True) );
 {$ENDIF}
-{$IFDEF LINUX}
+{$IFDEF UNIX}
   PYTHON_KNOWN_VERSIONS: array[1..9] of TPythonVersionProp =
   ( (DllName: 'libpython2.3.so'; RegVersion: '2.3'; APIVersion: 1012; CanUseLatest: True),
     (DllName: 'libpython2.4.so'; RegVersion: '2.4'; APIVersion: 1012; CanUseLatest: True),
@@ -1396,7 +1401,7 @@ type
     procedure SendUniData( const Data : UnicodeString ); virtual;
     function  ReceiveUniData : UnicodeString; virtual;
     procedure AddPendingWrite; virtual;
-    function  GetCurrentThreadSlotIdx : Integer;
+    function  GetCurrentThreadSlotIdx : integer;
     function  GetCurrentThreadLine : IOString;
     procedure UpdateCurrentThreadLine;
 
@@ -1441,7 +1446,7 @@ type
     FAutoUnload         : Boolean;
     FFatalMsgDlg        : Boolean;
     FFatalAbort         : Boolean;
-    FDLLHandle          : THandle;
+    FDLLHandle          : TLibHandle;
     FUseLastKnownVersion: Boolean;
     FOnBeforeLoad       : TNotifyEvent;
     FOnAfterLoad        : TNotifyEvent;
@@ -3248,14 +3253,14 @@ procedure TPythonInputOutput.AddPendingWrite;
 begin
 end;
 
-function  TPythonInputOutput.GetCurrentThreadSlotIdx : Integer;
+function  TPythonInputOutput.GetCurrentThreadSlotIdx : integer;
 var
-  thread_id : Longint;
-  i : Integer;
+  thread_id : TThreadID;
+  i : integer;
 begin
   thread_id := GetCurrentThreadId;
   for i := 0 to FLinesPerThread.Count-1 do
-    if Longint(FLinesPerThread.Objects[i]) = thread_id then
+    if TThreadID(FLinesPerThread.Objects[i]) = thread_id then
       begin
         Result := i;
         Exit;
@@ -3280,17 +3285,24 @@ end;
 (*******************************************************)
 
 procedure TDynamicDll.DoOpenDll(const aDllName : String);
+var p : pointer;
 begin
   if not IsHandleValid then
   begin
     FDllName := aDllName;
-    FDLLHandle := SafeLoadLibrary(
+    {$IFDEF FREEBSD}
+      FDllHandle := LoadLibrary(GetDllPath+DllName);
+      if FDllHandle = NilHandle then
+        raise Exception.Create('Error loading library: ' + getLoadErrorStr);
+    {$ELSE}
+      FDLLHandle := SafeLoadLibrary(
       {$IFDEF FPC}
         PAnsiChar(AnsiString(GetDllPath+DllName))
-      {$ELSE}
+        {$ELSE}
         GetDllPath+DllName
-      {$ENDIF}
-    );
+        {$ENDIF}
+      );
+    {$ENDIF}
   end;
 end;
 
@@ -3325,26 +3337,27 @@ begin
   FDLLHandle := 0;
 
   DoOpenDll(aDllName);
-
-  if not IsHandleValid then begin
-{$IFDEF MSWINDOWS}
-    s := Format('Error %d: Could not open Dll "%s"',[GetLastError, DllName]);
-{$ENDIF}
-{$IFDEF LINUX}
-    s := Format('Error: Could not open Dll "%s"',[DllName]);
-{$ENDIF}
-    if FatalMsgDlg then
-{$IFDEF MSWINDOWS}
-      MessageBox( GetActiveWindow, PChar(s), 'Error', MB_TASKMODAL or MB_ICONSTOP );
-{$ENDIF}
-{$IFDEF LINUX}
-      WriteLn(ErrOutput, s);
-{$ENDIF}
-
-    if FatalAbort then
-      Quit;
-  end else
-    AfterLoad;
+  
+  if not IsHandleValid then
+    begin
+      {$IFDEF MSWINDOWS}
+      s := Format('Error %d: Could not open Dll "%s"',
+                  [GetLastError, DllName]);
+      {$ENDIF}
+      {$IFDEF UNIX}
+      s := Format('Error: Could not open Dll "%s"',[DllName]);
+      {$ENDIF}
+      if FatalMsgDlg then
+        {$IFDEF MSWINDOWS}
+        MessageBox( GetActiveWindow, PChar(s),
+                    'Error', MB_TASKMODAL or MB_ICONSTOP );
+        {$ENDIF}
+        {$IFDEF UNIX}
+        WriteLn(ErrOutput, s);
+        {$ENDIF}
+      if FatalAbort then Quit;
+    end
+  else AfterLoad;
 end;
 
 constructor TDynamicDll.Create(AOwner: TComponent);
@@ -3354,6 +3367,7 @@ begin
   FFatalAbort           := True;
   FAutoLoad             := True;
   FUseLastKnownVersion  := True;
+  FDllHandle            := 0;
 end;
 
 destructor TDynamicDll.Destroy;
@@ -3366,11 +3380,19 @@ end;
 function TDynamicDll.Import(const funcname: AnsiString; canFail : Boolean = True): Pointer;
 var
   E : EDllImportError;
+  s : string;
 begin
-  Result := GetProcAddress( FDLLHandle, PAnsiChar(funcname) );
+  Result := GetProcAddress( FDLLHandle, funcname );
   if (Result = nil) and canFail then begin
-    E := EDllImportError.CreateFmt('Error %d: could not map symbol "%s"', [GetLastError, funcname]);
+{$IFDEF MSWINDOWS}
+    E := EDllImportError.CreateFmt('Error %d: could not map symbol "%s"',
+                                   [GetLastError, funcname]);
     E.ErrorCode := GetLastError;
+{$ELSE}
+    E := EDllImportError.CreateFmt('Error mapping symbol "%s": %s',
+                                   [funcname, GetLoadErrorStr]);
+    E.ErrorCode := -1;
+{$ENDIF}
     E.WrongFunc := funcname;
     raise E;
   end;
@@ -3387,9 +3409,8 @@ function  TDynamicDll.IsHandleValid : Boolean;
 begin
 {$IFDEF MSWINDOWS}
   Result := (FDLLHandle >= 32);
-{$ENDIF}
-{$IFDEF LINUX}
-  Result := FDLLHandle <> 0;
+{$ELSE}
+  Result := FDLLHandle <> NilHandle;
 {$ENDIF}
 end;
 
@@ -3487,9 +3508,8 @@ procedure TPythonInterface.AfterLoad;
 begin
   inherited;
   FIsPython3000 := Pos('PYTHON3', UpperCase(DLLName)) = 1;
-  FMajorVersion := StrToInt(DLLName[7 {$IFDEF LINUX}+3{$ENDIF}]);
-  FMinorVersion := StrToInt(DLLName[8{$IFDEF LINUX}+3{$ENDIF}]);
-
+  FMajorVersion := StrToInt(DLLName[7{$IFDEF unix}+3{$ENDIF}]);
+  FMinorVersion := StrToInt(DLLName[8{$IFDEF unix}+4{$ENDIF}]);
 
   if FIsPython3000 then
     FBuiltInModuleName := 'builtins'
@@ -3504,7 +3524,7 @@ begin
 {$IFDEF MSWINDOWS}
         MessageBox( GetActiveWindow, PChar(E.Message), 'Error', MB_TASKMODAL or MB_ICONSTOP );
 {$ENDIF}
-{$IFDEF LINUX}
+{$IFDEF UNIX}
         WriteLn( ErrOutput, E.Message );
 {$ENDIF}
       if FatalAbort then Quit;
@@ -4650,7 +4670,7 @@ begin
     for i:= Integer(COMPILED_FOR_PYTHON_VERSION_INDEX) to High(PYTHON_KNOWN_VERSIONS) do
     begin
       RegVersion := PYTHON_KNOWN_VERSIONS[i].RegVersion;
-      FDLLHandle := SafeLoadLibrary(GetDllPath+PYTHON_KNOWN_VERSIONS[i].DllName);
+      inherited DoOpenDll(PYTHON_KNOWN_VERSIONS[i].DllName);
       if IsHandleValid then
       begin
         DllName := PYTHON_KNOWN_VERSIONS[i].DllName;
@@ -6224,7 +6244,7 @@ end;
 function TPythonEngine.PyUnicode_AsWideString( obj : PPyObject ) : UnicodeString;
 var
   _size : Integer;
-{$IFDEF LINUX}
+{$IFDEF UNIX}
   _ucs4Str : UCS4String;
 {$ENDIF}
 begin
@@ -6233,7 +6253,7 @@ begin
     _size := PySequence_Length(obj);
     if _size > 0 then
     begin
-{$IFDEF LINUX}
+{$IFDEF UNIX}
       // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
       SetLength(_ucs4Str, _size+1);
       if PyUnicode_AsWideChar(obj, @_ucs4Str[0], _size) <> _size then
@@ -6256,12 +6276,12 @@ begin
 end;
 
 function TPythonEngine.PyUnicode_FromWideString( const AString : UnicodeString) : PPyObject;
-{$IFDEF LINUX}
+{$IFDEF UNIX}
 var
   _ucs4Str : UCS4String;
 {$ENDIF}
 begin
-{$IFDEF LINUX}
+{$IFDEF UNIX}
   // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
   _ucs4Str := WideStringToUCS4String(AString);
   Result := PyUnicode_FromWideChar( {PWideChar}(@_ucs4Str[0]), Length(AString) );
