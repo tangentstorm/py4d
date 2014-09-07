@@ -3556,7 +3556,11 @@ begin
   if (fMajorVersion > 3) or ((fMajorVersion = 3) and (fMinorVersion >= 3)) then
     Result := ''
   else if APIVersion >= 1011 then
+{$IFDEF FREEBSD}
+    Result := 'UCS4'
+{$ELSE}
     Result := 'UCS2'
+{$ENDIF}
   else
     Result := '';
 end;
