@@ -2,3 +2,6 @@
 *.ppu
 *.so
 *~
+
+# a symlink i use for convenience:
+Core
