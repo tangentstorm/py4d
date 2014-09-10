@@ -2,7 +2,7 @@
 
 This is @tangentstorm's personal fork of the excellent [[https://code.google.com/p/python4delphi/][python4delphi]].
 
-The files in this top directory are my own, everything else is from the official SVN, except for a few changes I've made in [[https://github.com/tangentstorm/py4d/blob/master/PythonForDelphi/Components/Sources/Core/PythonEngine.pas][PythonEngine.pas]] to get things working on FreeBSD.
+The files in this top directory are my own. Everything else is from the official SVN, except for a few changes I've made in [[https://github.com/tangentstorm/py4d/blob/master/PythonForDelphi/Components/Sources/Core/PythonEngine.pas][PythonEngine.pas]] to get things working on FreeBSD.
 
 ** Files in this directory
 
