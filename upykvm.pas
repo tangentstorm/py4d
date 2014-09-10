@@ -1,4 +1,4 @@
-{$mode delphiunicode}
+{$i xpc}{$mode delphiunicode}
 unit upykvm;
 interface uses
   xpc, classes, sysutils,
@@ -128,13 +128,12 @@ function PyReadKey( self, args : PPyObject ) : PPyObject; cdecl;
   end;
 
 function PyGetLine( self, args : PPyObject ) : PPyObject; cdecl;
-  var a:PAnsiChar; s:TStr;
+  var pa:PAnsiChar; si:TStr='';
   begin with gEng do
     begin
-      if PyArg_ParseTuple(args, 's:emit', @a) <> 0 then begin
-	lined.prompt(a, s);
-	a := PAnsiChar(u2a(s));
-	result := Py_BuildValue('s',@a);
+      if PyArg_ParseTuple(args, 's:getline', @pa) <> 0 then begin
+	lined.prompt(TStr(pa), si);
+	result := PyString_FromString(PAnsiChar(u2a(si)));
       end;
     end
   end;
