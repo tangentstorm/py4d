@@ -3,11 +3,20 @@ unit upykvm;
 interface uses
   xpc, classes, sysutils,
   PythonEngine,
-  kvm, cw;
+  kvm, cw, kbd, lined, keyboard;
 
   procedure initkvm; cdecl;
   procedure PyInit_kvm; cdecl;
 
+type
+  TPythonKvmIO = class(TPythonInputOutput)
+    procedure SendData(const data : AnsiString); override;
+    procedure SendUniData(const Data : UnicodeString ); override;
+    function  ReceiveData : AnsiString; override;
+    function  ReceiveUniData : UnicodeString; override;
+  end;
+
+
 implementation
 
 var
@@ -93,7 +102,56 @@ function PyBg( self, args : PPyObject ) : PPyObject; cdecl;
       result := Py_None;
     end;
   end;
+
 
+function PyInitKeyboard( self, args : PPyObject ) : PPyObject; cdecl;
+  begin keyboard.initkeyboard; result := gEng.Py_None;
+  end;
+
+function PyDoneKeyboard( self, args : PPyObject ) : PPyObject; cdecl;
+  begin keyboard.donekeyboard; result := gEng.Py_None;
+  end;
+
+
+function PyKeyPressed( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do
+    if kbd.keypressed then result := PPyObject(Py_True)
+    else result := PPyObject(Py_False);
+  end;
+
+function PyReadKey( self, args : PPyObject ) : PPyObject; cdecl;
+  var c:char;
+  begin with gEng do
+    begin
+      c := u2a(kbd.readkey)[1]; result := Py_BuildValue('s',@c);
+    end
+  end;
+
+function PyGetLine( self, args : PPyObject ) : PPyObject; cdecl;
+  var a:PAnsiChar; s:TStr;
+  begin with gEng do
+    begin
+      if PyArg_ParseTuple(args, 's:emit', @a) <> 0 then begin
+	lined.prompt(a, s);
+	a := PAnsiChar(u2a(s));
+	result := Py_BuildValue('s',@a);
+      end;
+    end
+  end;
+
+
+procedure TPythonKvmIO.SendData(const data : AnsiString);
+  begin write(data);
+  end;
+procedure TPythonKvmIO.SendUniData(const Data : UnicodeString );
+  begin write(data);
+  end;
+function  TPythonKvmIO.ReceiveData : AnsiString;
+  begin readln(result);
+  end;
+function  TPythonKvmIO.ReceiveUniData : UnicodeString;
+  begin readln(result);
+  end;
 
 procedure initkvm; cdecl;
   begin
@@ -103,6 +161,7 @@ procedure initkvm; cdecl;
 	gEng := TPythonEngine.Create(Nil);
 	gEng.AutoFinalize := false;
 	gEng.Initialize;
+	gEng.IO := TPythonKvmIO.Create(gEng);
       end
     end;
 
@@ -119,6 +178,12 @@ procedure initkvm; cdecl;
     gMod.AddMethod('popTerm', @PyPopTerm, 'pop subterminal off stack');
     gMod.AddMethod('fg', @PyFg, 'set foreground');
     gMod.AddMethod('bg', @PyBg, 'set background');
+    gMod.AddMethod('keyPressed', @PyKeyPressed, 'is keypressed?');
+    gMod.AddMethod('readKey', @PyReadKey, 'get a character from the keyboard');
+
+    gMod.AddMethod('getLine', @PyGetLine, 'read a line of text, interactively');
+    gMod.AddMethod('initKeyboard', @PyInitKeyboard, 'initialize keyboard driver');
+    gMod.AddMethod('doneKeyboard', @PyDoneKeyboard, 'finalize keyboard driver');
 
     gMod.DocString.text := 'Python KVM module';
     gMod.Initialize;
@@ -131,6 +196,7 @@ procedure PyInit_kvm; cdecl;
   end;
 
 initialization
+  keyboard.donekeyboard;
 finalization
   gEng.free;
   gMod.free;
