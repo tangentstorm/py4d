@@ -73,8 +73,10 @@ uses
 {$IFDEF UNIX}
   Types,
 {$ENDIF}
-{$IFDEF LINUX}
-  Libc,
+{$IFNDEF FPC}
+  {$IFDEF LINUX}
+  Libc, // kylix needs this. fpc doesn't
+  {$ENDIF}
 {$ENDIF}
   Classes,
   SysUtils,
@@ -1373,9 +1375,9 @@ type
   IOString = UnicodeString;
   TIOStringList = TUnicodeStringList;
 
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
+//  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
+//  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
+//  {$IFEND}
   TPythonInputOutput = class(TComponent)
   protected
     FMaxLines        : Integer;
@@ -2113,9 +2115,9 @@ type
       property Limit : Integer read FLimit write FLimit;
   end;
 
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
+//  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
+//  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
+//  {$IFEND}
   TPythonEngine = class(TPythonInterface)
   private
     FInitScript:                 TStrings;
@@ -2581,9 +2583,9 @@ type
     property Items[Index: Integer]: TError read GetError write SetError; default;
   end;
 
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
+//  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
+//  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
+//  {$IFEND}
   TPythonModule = class(TMethodsContainer)
     protected
       FModuleName : AnsiString;
@@ -2846,9 +2848,9 @@ type
 
   // The component that initializes the Python type and
   // that creates instances of itself.
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
+//  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
+//  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
+//  {$IFEND}
   TPythonType = class(TGetSetContainer)
     protected
       FType : PyTypeObject;
@@ -2934,9 +2936,9 @@ type
   TExtGetDataEvent = procedure ( Sender : TObject; var Data : PPyObject ) of Object;
   TExtSetDataEvent = procedure ( Sender : TObject; Data : PPyObject) of Object;
 
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
+//  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
+//  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
+//  {$IFEND}
   TPythonDelphiVar = class( TEngineClient )
     protected
       FModule    : AnsiString;
@@ -3460,7 +3462,7 @@ begin
 {$ENDIF}
 {$IFDEF LINUX}
     WriteLn(ErrOutput, GetQuitMessage);
-    __exit( 1 );
+//    __exit( 1 );
 {$ENDIF}
   end;
 end;
