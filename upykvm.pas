@@ -23,26 +23,33 @@ var
   gEng : TPythonEngine;
   gMod : TPythonModule;
 
+function NoneRef: PPyObject; cdecl;
+  begin result := gEng.Py_None; gEng.Py_IncRef(result)
+  end;
+function TrueRef: PPyObject; cdecl;
+  begin result := PPyObject(gEng.Py_True); gEng.Py_IncRef(result)
+  end;
+function FalseRef: PPyObject; cdecl;
+  begin result := PPyObject(gEng.Py_False); gEng.Py_IncRef(result)
+  end;
 
 function PyClrScr( self, args : PPyObject ) : PPyObject; cdecl;
-  begin kvm.ClrScr; result := gEng.Py_None;
+  begin kvm.ClrScr; result := NoneRef;
   end;
 
 function PyClrEol( self, args : PPyObject ) : PPyObject; cdecl;
-  begin kvm.ClrEol; result := gEng.Py_None;
+  begin kvm.ClrEol; result := NoneRef;
   end;
 
 function PyNewLine( self, args : PPyObject ) : PPyObject; cdecl;
-  begin kvm.NewLine; result := gEng.Py_None;
+  begin kvm.NewLine; result := NoneRef;
   end;
 
 function PyEmit( self, args : PPyObject ) : PPyObject; cdecl;
   var a:PAnsiChar;
-  begin with gEng do
-    begin
-      if PyArg_ParseTuple(args, 's:emit', @a) <> 0 then kvm.emit(a);
-      result := Py_None;
-    end;
+  begin
+    if gEng.PyArg_ParseTuple(args, 's:emit', @a) <> 0 then kvm.emit(a);
+    result := NoneRef;
   end;
 
 function PyCWrite( self, args : PPyObject ) : PPyObject; cdecl;
@@ -51,7 +58,7 @@ function PyCWrite( self, args : PPyObject ) : PPyObject; cdecl;
     with gEng do begin
       // TODO: if PyTuple_Size(args) <> 1 then throw python Exception
       if PyArg_ParseTuple(args, 's:cwrite', @a) <> 0 then cw.cwrite(a);
-      result := Py_None;
+      result := NoneRef;
     end;
   end;
 
@@ -62,7 +69,7 @@ function PyGotoXY( self, args : PPyObject ) : PPyObject; cdecl;
       // TODO: if PyTuple_Size(args) <> 1 then throw python Exception
       if PyArg_ParseTuple(args, 'ii:gotoXY', @x,@y) <> 0 then
 	kvm.GotoXY(x,y);
-      result := Py_None;
+      result := NoneRef;
     end;
   end;
 
@@ -72,14 +79,14 @@ function PyPushSub( self, args : PPyObject ) : PPyObject; cdecl;
     begin
       if PyArg_ParseTuple(args, 'iiii:pushSub', @x,@y,@w,@h) <> 0 then
 	kvm.PushSub(x,y,w,h);
-      result := Py_None;
+      result := NoneRef;
     end;
   end;
 
 function PyPopTerm( self, args : PPyObject ) : PPyObject; cdecl;
   begin
     with gEng do begin
-      kvm.PopTerm; result := Py_None;
+      kvm.PopTerm; result := NoneRef;
     end;
   end;
 
@@ -89,7 +96,7 @@ function PyFg( self, args : PPyObject ) : PPyObject; cdecl;
     begin
       //if PyArg_ParseTuple(args, 's:Fg', @a) <> 0 then kvm.fg(a[1]) else
       if PyArg_ParseTuple(args, 'i:Fg', @i) <> 0 then kvm.fg(i);
-      result := Py_None;
+      result := NoneRef;
     end;
   end;
 
@@ -99,24 +106,23 @@ function PyBg( self, args : PPyObject ) : PPyObject; cdecl;
     begin
       //if PyArg_ParseTuple(args, 's:Bg', @a) <> 0 then kvm.fg(a[1]) else
       if PyArg_ParseTuple(args, 'i:Bg', @i) <> 0 then kvm.Bg(i);
-      result := Py_None;
+      result := NoneRef;
     end;
   end;
 
 
 function PyInitKeyboard( self, args : PPyObject ) : PPyObject; cdecl;
-  begin keyboard.initkeyboard; result := gEng.Py_None;
+  begin keyboard.initkeyboard; result := NoneRef;
   end;
 
 function PyDoneKeyboard( self, args : PPyObject ) : PPyObject; cdecl;
-  begin keyboard.donekeyboard; result := gEng.Py_None;
+  begin keyboard.donekeyboard; result := NoneRef;
   end;
-
 
 function PyKeyPressed( self, args : PPyObject ) : PPyObject; cdecl;
   begin with gEng do
-    if kbd.keypressed then result := PPyObject(Py_True)
-    else result := PPyObject(Py_False);
+    if kbd.keypressed then result := TrueRef
+    else result := FalseRef;
   end;
 
 function PyReadKey( self, args : PPyObject ) : PPyObject; cdecl;
