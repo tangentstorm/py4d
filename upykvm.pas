@@ -3,7 +3,7 @@ unit upykvm;
 interface uses
   xpc, classes, sysutils,
   PythonEngine,
-  kvm, cw, kbd, lined, keyboard;
+  kvm, cw, kbd, lined, keyboard, arrays;
 
   procedure initkvm; cdecl;
   procedure PyInit_kvm; cdecl;
@@ -15,23 +15,31 @@ type
     function  ReceiveData : AnsiString; override;
     function  ReceiveUniData : UnicodeString; override;
   end;
-
+  TTerms = GArray<ITerm>;
 
 implementation
 
 var
-  gEng : TPythonEngine;
-  gMod : TPythonModule;
+  gEng	 : TPythonEngine;
+  gMod	 : TPythonModule;
+  gTerms : TTerms;
+
+{-- python constants --}
 
 function NoneRef: PPyObject; cdecl;
   begin result := gEng.Py_None; gEng.Py_IncRef(result)
   end;
+
 function TrueRef: PPyObject; cdecl;
   begin result := PPyObject(gEng.Py_True); gEng.Py_IncRef(result)
   end;
+
 function FalseRef: PPyObject; cdecl;
   begin result := PPyObject(gEng.Py_False); gEng.Py_IncRef(result)
   end;
+
+
+{-- clear screen / line --}
 
 function PyClrScr( self, args : PPyObject ) : PPyObject; cdecl;
   begin kvm.ClrScr; result := NoneRef;
@@ -41,6 +49,8 @@ function PyClrEol( self, args : PPyObject ) : PPyObject; cdecl;
   begin kvm.ClrEol; result := NoneRef;
   end;
 
+{-- generating text --}
+
 function PyNewLine( self, args : PPyObject ) : PPyObject; cdecl;
   begin kvm.NewLine; result := NoneRef;
   end;
@@ -61,7 +71,9 @@ function PyCWrite( self, args : PPyObject ) : PPyObject; cdecl;
       result := NoneRef;
     end;
   end;
-
+
+{-- cursor control --}
+
 function PyGotoXY( self, args : PPyObject ) : PPyObject; cdecl;
   var x, y: integer;
   begin
@@ -72,6 +84,8 @@ function PyGotoXY( self, args : PPyObject ) : PPyObject; cdecl;
       result := NoneRef;
     end;
   end;
+
+{-- subterms --}
 
 function PyPushSub( self, args : PPyObject ) : PPyObject; cdecl;
   var x,y,w,h:integer;
@@ -79,6 +93,29 @@ function PyPushSub( self, args : PPyObject ) : PPyObject; cdecl;
     begin
       if PyArg_ParseTuple(args, 'iiii:pushSub', @x,@y,@w,@h) <> 0 then
 	kvm.PushSub(x,y,w,h);
+      result := NoneRef;
+    end;
+  end;
+
+function PySubTerm( self, args : PPyObject ) : PPyObject; cdecl;
+  var x,y,w,h:integer;
+  begin with gEng do
+    begin
+      if PyArg_ParseTuple(args, 'iiii:subTerm', @x,@y,@w,@h) <> 0 then
+	result := PyInt_FromLong(
+		    gTerms.append( kvm.SubTerm( kvm.asTerm, x,y,w,h )))
+      else result := NoneRef;
+    end
+  end;
+
+function PyPushTerm( self, args : PPyObject ) : PPyObject; cdecl;
+  var i : integer;
+  begin
+    with gEng do begin
+      if PyArg_ParseTuple(args, 'i:subTerm', @i) <> 0 then
+	if (i >= 0) and (i < gTerms.length ) then
+	  kvm.PushTerm(gTerms[i])
+	else ok; //  TODO: error message for bad index!
       result := NoneRef;
     end;
   end;
@@ -148,12 +185,15 @@ function PyGetLine( self, args : PPyObject ) : PPyObject; cdecl;
 procedure TPythonKvmIO.SendData(const data : AnsiString);
   begin write(data);
   end;
+
 procedure TPythonKvmIO.SendUniData(const Data : UnicodeString );
   begin write(data);
   end;
+
 function  TPythonKvmIO.ReceiveData : AnsiString;
   begin readln(result);
   end;
+
 function  TPythonKvmIO.ReceiveUniData : UnicodeString;
   begin readln(result);
   end;
@@ -179,6 +219,8 @@ procedure initkvm; cdecl;
     gMod.AddMethod('emit', @PyEmit, 'Emit a string');
     gMod.AddMethod('cwrite', @PyCWrite, 'colorwrite');
     gMod.AddMethod('gotoXY', @PyGotoXY, 'move cursor to x,y coordinates');
+    gMod.AddMethod('subTerm', @PySubTerm, 'get handle to (x,y,w,h) subterminal');
+    gMod.AddMethod('pushTerm', @PyPushTerm, 'push a handle creaned with subTerm');
     gMod.AddMethod('pushSub', @PyPushSub, 'push a (x,y,w,h) subterminal');
     gMod.AddMethod('popTerm', @PyPopTerm, 'pop subterminal off stack');
     gMod.AddMethod('fg', @PyFg, 'set foreground');
@@ -199,10 +241,13 @@ procedure initkvm; cdecl;
 procedure PyInit_kvm; cdecl;
   begin initkvm
   end;
-
+
+var term : ITerm;
 initialization
-  keyboard.donekeyboard;
+  keyboard.DoneKeyboard;
+  gTerms := TTerms.Create;
 finalization
-  gEng.free;
-  gMod.free;
+  gTerms.Free;
+  gEng.Free;
+  gMod.Free;
 end.
