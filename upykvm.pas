@@ -48,6 +48,16 @@ function PyClrScr( self, args : PPyObject ) : PPyObject; cdecl;
 function PyClrEol( self, args : PPyObject ) : PPyObject; cdecl;
   begin kvm.ClrEol; result := NoneRef;
   end;
+
+{-- screen dimensions --}
+
+function PyGetW( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.width )
+  end;
+
+function PyGetH( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.height )
+  end;
 
 {-- generating text --}
 
@@ -227,6 +237,9 @@ procedure initkvm; cdecl;
     gMod.AddMethod('bg', @PyBg, 'set background');
     gMod.AddMethod('keyPressed', @PyKeyPressed, 'is keypressed?');
     gMod.AddMethod('readKey', @PyReadKey, 'get a character from the keyboard');
+
+    gMod.AddMethod('getW', @PyGetW, 'width of current terminal');
+    gMod.AddMethod('getH', @PyGetH, 'height of current terminal');
 
     gMod.AddMethod('getLine', @PyGetLine, 'read a line of text, interactively');
     gMod.AddMethod('initKeyboard', @PyInitKeyboard, 'initialize keyboard driver');
