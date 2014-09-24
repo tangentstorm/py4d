@@ -58,6 +58,17 @@ function PyGetW( self, args : PPyObject ) : PPyObject; cdecl;
 function PyGetH( self, args : PPyObject ) : PPyObject; cdecl;
   begin with gEng do result := PyInt_FromLong( kvm.height )
   end;
+
+  function PyXMax( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.xMax )
+  end;
+
+function PyYMax( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.yMax )
+  end;
+
+
+
 
 {-- generating text --}
 
@@ -82,6 +93,7 @@ function PyCWrite( self, args : PPyObject ) : PPyObject; cdecl;
     end;
   end;
 
+
 {-- cursor control --}
 
 function PyGotoXY( self, args : PPyObject ) : PPyObject; cdecl;
@@ -94,6 +106,23 @@ function PyGotoXY( self, args : PPyObject ) : PPyObject; cdecl;
       result := NoneRef;
     end;
   end;
+
+function PyWhereX( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.whereX )
+  end;
+
+function PyWhereY( self, args : PPyObject ) : PPyObject; cdecl;
+  begin with gEng do result := PyInt_FromLong( kvm.whereY )
+  end;
+
+function PyShowCursor( self, args : PPyObject ) : PPyObject; cdecl;
+  begin kvm.ShowCursor; result := NoneRef;
+  end;
+
+function PyHideCursor( self, args : PPyObject ) : PPyObject; cdecl;
+  begin kvm.HideCursor; result := NoneRef;
+  end;
+
 
 {-- subterms --}
 
@@ -176,7 +205,7 @@ function PyReadKey( self, args : PPyObject ) : PPyObject; cdecl;
   var c:char;
   begin with gEng do
     begin
-      c := u2a(kbd.readkey)[1]; result := Py_BuildValue('s',@c);
+      c := u2a(kbd.readkey)[1]; result := Py_BuildValue('u#',@c,1);
     end
   end;
 
@@ -237,10 +266,14 @@ procedure initkvm; cdecl;
     gMod.AddMethod('bg', @PyBg, 'set background');
     gMod.AddMethod('keyPressed', @PyKeyPressed, 'is keypressed?');
     gMod.AddMethod('readKey', @PyReadKey, 'get a character from the keyboard');
-
     gMod.AddMethod('getW', @PyGetW, 'width of current terminal');
     gMod.AddMethod('getH', @PyGetH, 'height of current terminal');
-
+    gMod.AddMethod('xMax', @PyXMax, 'max x coordinate');
+    gMod.AddMethod('yMax', @PyYMax, 'max y coordinate');
+    gMod.AddMethod('whereX', @PyWhereX, 'cursor x position');
+    gMod.AddMethod('whereY', @PyWhereY, 'cursor y position');
+    gMod.AddMethod('showCursor', @PyShowCursor, 'show the cursor');
+    gMod.AddMethod('hideCursor', @PyHideCursor, 'hide the cursor');
     gMod.AddMethod('getLine', @PyGetLine, 'read a line of text, interactively');
     gMod.AddMethod('initKeyboard', @PyInitKeyboard, 'initialize keyboard driver');
     gMod.AddMethod('doneKeyboard', @PyDoneKeyboard, 'finalize keyboard driver');
